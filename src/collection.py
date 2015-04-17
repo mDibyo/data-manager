@@ -25,14 +25,21 @@ class Collection(object):
                     raise KeyError('attribute {} does not exist'.format(attr))
                 return self.values[index]
 
-        Entry.attrs = kwargs['attrs']
-        Entry.id_attr = kwargs['id_attr']
-        for index, attr in Entry.attrs:
+        if len(args) >= 1:
+            Entry.attrs = args[0]
+        else:
+            Entry.attrs = kwargs['attrs']
+        for index, attr in enumerate(Entry.attrs):
             Entry.attr_indices_map[attr] = index
-        Entry.id_attr_index = Entry.attr_indices_map[Entry.id_attr]
+        if len(args) >= 2:
+            Entry.id_attr = args[1]
+        else:
+            Entry.id_attr = kwargs.get('id_attr', None)
+        if Entry.id_attr is not None:
+            Entry.id_attr_index = Entry.attr_indices_map[Entry.id_attr]
         cls.Entry = Entry
 
-        return super(Collection, cls).__new__(*args, **kwargs)
+        return super(Collection, cls).__new__(cls)
 
     def __init__(self, attrs, id_attr=None):
         self.attrs = attrs
