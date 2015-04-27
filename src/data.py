@@ -2,6 +2,7 @@
 
 import os.path as osp
 import csv
+import re
 
 __author__ = "Dibyo Majumdar"
 __email__ = "dibyo.majumdar@gmail.com"
@@ -52,8 +53,6 @@ class DataTable(object):
                     db_entry[attr] = value
 
                 return db_entry
-
-        print args, kwargs
 
         if len(args) >= 2:
             Entry.attrs = args[1]
@@ -111,6 +110,11 @@ class DataTable(object):
         self.id_attr_entries_map = {}
 
     @classmethod
+    def from_data_table(cls, data_table, mapping):
+        pass
+        # return cls()
+
+    @classmethod
     def from_db(cls, db_collection, id_attr=None):
         attrs = []
         for attr in db_collection.find_one().iterkeys():
@@ -143,6 +147,59 @@ class DataTable(object):
             csv_table.writerow(entry)
 
 
+class DataTableMappingTemplateGenerator(object):
+    format_re = re.compile(r'\$(\w+)')
+
+    def __new__(cls, key_format_str, value_format_str='', submappings=None):
+        class DataTableMappingTemplate(object):
+            parent = None
+            attrs = {}
+
+            key_format_str = ''
+            value_format_str = ''
+            common_submappings = []
+
+            def __init__(self, **kwargs):
+                for attr in self.attrs.iterkeys():
+                    self.attrs[attr] = kwargs.get(attr)
+
+                self.submappings = kwargs.get('submappings', [])
+                for submapping in self.submappings:
+                    submapping.parent = self
+                self.submappings.extend(self.common_submappings)
+
+            def __getitem__(self, item):
+                if item in self.attrs:
+                    return self.attrs[item]
+                elif self.parent is not None:
+                    return self.parent[item]
+                return None
+
+            def get_map(self):
+                key = cls.format_re.sub(lambda match: self[match.group(1)],
+                                        self.key_format_str)
+
+                if self.submappings:
+                    value = {}
+                    for submapping in self.submappings:
+                        sub_key, sub_value = submapping.get_map()
+                        value[sub_key] = sub_value
+                else:
+                    value = \
+                        cls.format_re.sub(lambda match: self[match.group(1)],
+                                          self.value_format_str)
+
+                return key, value
+
+        DataTableMappingTemplate.key_format_str = key_format_str
+        DataTableMappingTemplate.value_format_str = value_format_str
+        DataTableMappingTemplate.value_submappings = \
+            submappings if submappings is not None else []
+        return DataTableMappingTemplate
+
+
+
+
 def generate_database(csv_files):
     for csv_file in csv_files:
         collection = DataTable.from_csv_file(csv_file)
@@ -160,4 +217,11 @@ if __name__ == '__main__':
     client = MongoClient()
     db = client['bear_transit']
     c = db['api_call']
+
+
+
+
+
+
+
 
